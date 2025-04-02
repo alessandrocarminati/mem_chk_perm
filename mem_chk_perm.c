@@ -126,8 +126,15 @@ void child_process(MemRegion region, int mode) {
 		printf("[%d] mode=%d, mask=%d res=%d\n", pid, mode, modebit << i, (mode & (modebit << i)));
 		if (mode & (modebit << i)) {
 			int *ptr = (int *)addresses[i];
+			int old;
 			printf("[%d] Testing %p\n", pid, ptr);
+			old = *ptr; // save old
 			*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
+			if (*ptr != ANSWER_TO_THE_ULTIMATE_QUESTION) {
+				printf("the write at %p was not successful (%d)\n", ptr, *ptr);
+				exit(2);
+			}
+			*ptr = old;
 		}
 	}
 	exit(8);
