@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -117,6 +118,7 @@ void handle_child_exit(pid_t pid, int status) {
 
 void child_process(MemRegion region) {
 
+	prctl(PR_SET_DUMPABLE, 0);
 	unsigned long addresses[3] = {region.start, (region.start + region.end) / 2, region.end - sizeof(int)};
 	for (int i = 0; i < 3; i++) {
 		int *ptr = (int *)addresses[i];
