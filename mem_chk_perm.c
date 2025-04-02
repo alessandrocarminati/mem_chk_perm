@@ -8,7 +8,13 @@
 #include <signal.h>
 
 #define MAX_REGIONS 1024
+
+#if __SIZEOF_POINTER__ == 8
 #define ADDRESS_SPACE_END 0xFFFFFFFFFFFFFFFF
+#else
+#define ADDRESS_SPACE_END 0xFFFFFFFF
+#endif
+
 #define WRITEOK 1
 #define WRITEKO 2
 #define ANSWER_TO_THE_ULTIMATE_QUESTION 42
