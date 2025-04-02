@@ -123,11 +123,9 @@ void child_process(MemRegion region, int mode) {
 	prctl(PR_SET_DUMPABLE, 0);
 	unsigned long addresses[3] = {region.start, (region.start + region.end) / 2, region.end - sizeof(int)};
 	for (int i = 0; i < 3; i++) {
-		printf("[%d] mode=%d, mask=%d res=%d\n", pid, mode, modebit << i, (mode & (modebit << i)));
 		if (mode & (modebit << i)) {
 			int *ptr = (int *)addresses[i];
 			int old;
-			printf("[%d] Testing %p\n", pid, ptr);
 			old = *ptr; // save old
 			*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
 			if (*ptr != ANSWER_TO_THE_ULTIMATE_QUESTION) {
