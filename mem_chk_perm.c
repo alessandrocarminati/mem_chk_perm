@@ -116,18 +116,32 @@ void handle_child_exit(pid_t pid, int status) {
 
 }
 
-void child_process(MemRegion region) {
+void child_process(MemRegion region, int mode) {
+	int modebit = 1;
+	pid_t pid = getpid();
 
 	prctl(PR_SET_DUMPABLE, 0);
 	unsigned long addresses[3] = {region.start, (region.start + region.end) / 2, region.end - sizeof(int)};
 	for (int i = 0; i < 3; i++) {
-		int *ptr = (int *)addresses[i];
-		*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
+		printf("[%d] mode=%d, mask=%d res=%d\n", pid, mode, modebit << i, (mode & (modebit << i)));
+		if (mode & (modebit << i)) {
+			int *ptr = (int *)addresses[i];
+			printf("[%d] Testing %p\n", pid, ptr);
+			*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
+		}
 	}
 	exit(8);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	int mode;
+
+	if (argc != 2) {
+		printf("%s <mode>\n", argv[0]);
+		return 1;
+	}
+	mode = atoi(argv[1]);
+	if ((mode <=0)||(mode>=8)) return 2;
 	memset(regions,0, sizeof(regions));
 	parse_proc_maps();
 	for (int i = 0; i < region_count; i++) {
@@ -136,7 +150,7 @@ int main() {
 			perror("Fork failed");
 			exit(EXIT_FAILURE);
 		} else if (pid == 0) {
-			child_process(regions[i]);
+			child_process(regions[i], mode);
 		} else {
 			regions[i].pid = pid;
 		}
