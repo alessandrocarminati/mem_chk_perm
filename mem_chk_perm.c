@@ -22,8 +22,8 @@
 
 
 typedef struct {
-	pid_t pid;
-	int status;
+	pid_t pid[3];
+	int status[3];
 	unsigned long start;
 	unsigned long end;
 	char perms[5];
@@ -87,84 +87,79 @@ void parse_proc_maps() {
 }
 void print_memory_map() {
 	printf("Memory Layout:\n");
-	printf("+-----------------------------------------+------+------------------------------------------+--------+----------------------+\n");
-	printf("| Memory Region                           | Perms| content                                  | TestPID| Result               |\n");
+	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
+	printf("| Memory Region                           | Perms| content                                  | Result Bottom        | Result middle        | Result upper         |\n");
 	for (int i = 0; i < region_count; i++) {
 
-		printf("+-----------------------------------------+------+------------------------------------------+--------+----------------------+\n");
-		printf("| 0x%016lx - 0x%016lx | %s | %-40s | %-6d | %-20s |\n",
-			   regions[i].start, regions[i].end, regions[i].perms, regions[i].name[0] ? regions[i].name : "[anonymous]", regions[i].pid, 
-			   reasons[regions[i].status]);
+		printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
+		printf("| 0x%016lx - 0x%016lx | %s | %-40s | %-29s | %-29s | %-29s |\n",
+			   regions[i].start, regions[i].end, regions[i].perms, regions[i].name[0] ? regions[i].name : "[anonymous]",
+			   reasons[regions[i].status[0]], reasons[regions[i].status[1]], reasons[regions[i].status[2]] );
 	}
-	printf("+-----------------------------------------+------+------------------------------------------+--------+----------------------+\n");
+	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
 }
 
 void handle_child_exit(pid_t pid, int status) {
-	int i = 0;
+	int i,j;
 
-	while (i < region_count && regions[i].pid != pid) {
-		i++;
-	}
-	if (regions[i].pid == pid) {
-		if (WIFEXITED(status)) {
-			regions[i].status = WRITEOK;
+	for (j = 0; j < 3; j++) {
+		for (i = 0; i < region_count; i++) {
+			if (regions[i].pid[j] == pid) {
+				if (WIFEXITED(status)) {
+					regions[i].status[j] = WRITEOK;
+				}
+				if (WIFSIGNALED(status)) {
+					regions[i].status[j] = WRITEKO;
+				}
+				return;
+			}
 		}
-		if (WIFSIGNALED(status)) {
-			regions[i].status = WRITEKO;
-		}
 	}
-
+	printf("[handle_child_exit]unknown pid (%d) exit\n", pid);
 }
 
-void child_process(MemRegion region, int mode) {
-	int modebit = 1;
+void child_process(MemRegion region, int test_type) {
 	pid_t pid = getpid();
+	int *ptr;
+	int old;
+	int i;
 
 	prctl(PR_SET_DUMPABLE, 0);
 	unsigned long addresses[3] = {region.start, (region.start + region.end) / 2, region.end - sizeof(int)};
-	for (int i = 0; i < 3; i++) {
-		if (mode & (modebit << i)) {
-			int *ptr = (int *)addresses[i];
-			int old;
-			old = *ptr; // save old
-			*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
-			if (*ptr != ANSWER_TO_THE_ULTIMATE_QUESTION) {
-				printf("the write at %p was not successful (%d)\n", ptr, *ptr);
-				exit(2);
-			}
-			*ptr = old;
-		}
+	ptr = (int *)addresses[test_type];
+	old = *ptr; // save old
+	*ptr = ANSWER_TO_THE_ULTIMATE_QUESTION;
+	if (*ptr != ANSWER_TO_THE_ULTIMATE_QUESTION) {
+		printf("the write at %p was not successful (%d)\n", ptr, *ptr);
+		exit(2);
 	}
-	exit(8);
+	*ptr = old;
+	exit(0);
 }
 
 int main(int argc, char *argv[]) {
-	int mode;
-
-	if (argc != 2) {
-		printf("%s <mode>\n", argv[0]);
-		return 1;
-	}
-	mode = atoi(argv[1]);
-	if ((mode <=0)||(mode>=8)) return 2;
 	memset(regions,0, sizeof(regions));
 	parse_proc_maps();
-	for (int i = 0; i < region_count; i++) {
-		pid_t pid = fork();
-		if (pid < 0) {
-			perror("Fork failed");
-			exit(EXIT_FAILURE);
-		} else if (pid == 0) {
-			child_process(regions[i], mode);
-		} else {
-			regions[i].pid = pid;
+	for (int j = 0; j<3; j++){
+		for (int i = 0; i < region_count; i++) {
+			pid_t pid = fork();
+			if (pid < 0) {
+				perror("Fork failed");
+				exit(EXIT_FAILURE);
+			} else if (pid == 0) {
+				child_process(regions[i], j);
+			} else {
+				regions[i].pid[j] = pid;
+			}
 		}
 	}
 
-	for (int i = 0; i < region_count; i++) {
-		int status;
-		pid_t pid = wait(&status);
-		handle_child_exit(pid, status);
+	for (int j = 0; j<3; j++){
+		for (int i = 0; i < region_count; i++) {
+			int status;
+			pid_t pid = wait(&status);
+			handle_child_exit(pid, status);
+		}
 	}
 
 	print_memory_map();
