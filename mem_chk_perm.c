@@ -23,7 +23,7 @@
 #define ANSWER_TO_THE_ULTIMATE_QUESTION 42
 
 #define LINE_FORMAT_REGULAR  "| 0x%016lx - 0x%016lx | %s | %-40s | %-29s | %-29s | %-29s |\n"
-#define LINE_FORMAT_MODIFIED "| \033[33m0x%016lx - 0x%016lx\033[0m | %s | %-40s | %-29s | %-29s | %-29s |\n"
+#define LINE_FORMAT_MODIFIED "|*\033[33m0x%016lx - 0x%016lx\033[0m*| %s | %-40s | %-29s | %-29s | %-29s |\n"
 
 
 typedef struct {
