@@ -30,7 +30,7 @@ typedef struct {
 	char name[256];
 } MemRegion;
 
-const char *reasons[3]={ "untested", "written ok", "segfault" };
+const char *reasons[3]={ "\033[33muntested\033[0m", "\033[32mwritten ok\033[0m", "\033[31msegfault\033[0m" };
 MemRegion regions[MAX_REGIONS];
 int region_count = 0;
 
