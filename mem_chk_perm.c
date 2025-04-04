@@ -22,8 +22,13 @@
 #define WRITEKO 2
 #define ANSWER_TO_THE_ULTIMATE_QUESTION 42
 
-#define LINE_FORMAT_REGULAR  "| 0x%016lx - 0x%016lx | %s | %-40s | %-29s | %-29s | %-29s |\n"
-#define LINE_FORMAT_MODIFIED "|*\033[33m0x%016lx - 0x%016lx\033[0m*| %s | %-40s | %-29s | %-29s | %-29s |\n"
+#ifdef DEBUG
+#define LINE_FORMAT_REGULAR  "| 0x%016lx - 0x%016lx | %s | %-40s | %-29s | %-29s | %-29s | %-21s | %d %d %d %d %d\n"
+#define LINE_FORMAT_MODIFIED "|*\033[33m0x%016lx - 0x%016lx\033[0m*| %s | %-40s | %-29s | %-29s | %-29s | %-21s | %d %d %d %d %d\n"
+#else
+#define LINE_FORMAT_REGULAR  "| 0x%016lx - 0x%016lx | %s | %-40s | %-29s | %-29s | %-29s | %-21s |\n"
+#define LINE_FORMAT_MODIFIED "|*\033[33m0x%016lx - 0x%016lx\033[0m*| %s | %-40s | %-29s | %-29s | %-29s | %-21s |\n"
+#endif
 
 
 typedef struct {
@@ -147,16 +152,43 @@ void parse_proc_maps(MemMap *m) {
 }
 void print_memory_map(MemMap *m, MemMap *m2) {
 	printf("Memory Layout:\n");
-	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
-	printf("| Memory Region                           | Perms| content                                  | Result Bottom        | Result middle        | Result upper         |\n");
+	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+---------+\n");
+	printf("| Memory Region                           | Perms| content                                  | Result Bottom        | Result middle        | Result upper         | Overall |\n");
 	for (int i = 0; i < m->region_count; i++) {
-
-		printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
+		//y = BCDE + A'B'C'D'E' + AB'C'D'E
+		int test_res = (
+				((m->regions[i].perms[1] == 'w') && 
+				 (m->regions[i].status[0] == WRITEOK) && 
+				 (m->regions[i].status[1] == WRITEOK) && 
+				 (m->regions[i].status[2] == WRITEOK)) ||
+				(((m->regions[i].start == m2->regions[i].start) && (m->regions[i].end == m2->regions[i].end)) && 
+				 !(m->regions[i].perms[1] == 'w') && 
+				 !(m->regions[i].status[0] == WRITEOK) && 
+				 !(m->regions[i].status[1] == WRITEOK) && 
+				 !(m->regions[i].status[2] == WRITEOK)) ||
+				(!((m->regions[i].start == m2->regions[i].start) && (m->regions[i].end == m2->regions[i].end)) && 
+				 !(m->regions[i].perms[1] == 'w') && 
+				 !(m->regions[i].status[0] == WRITEOK) && 
+				 !(m->regions[i].status[1] == WRITEOK) && 
+				 (m->regions[i].status[2] == WRITEOK))
+				);
+#ifdef DEBUG
+		int a1 = !((m->regions[i].start == m2->regions[i].start) && (m->regions[i].end == m2->regions[i].end));
+		int a2 = (m->regions[i].perms[1] == 'w');
+		int a3 = (m->regions[i].status[0] == WRITEOK);
+		int a4 = (m->regions[i].status[1] == WRITEOK);
+		int a5 = (m->regions[i].status[2] == WRITEOK);
+#endif
+		printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+---------+\n");
 		printf( ((m->regions[i].start == m2->regions[i].start) && (m->regions[i].end == m2->regions[i].end)) ? LINE_FORMAT_REGULAR : LINE_FORMAT_MODIFIED,
-			   m->regions[i].start, m->regions[i].end, m->regions[i].perms, m->regions[i].name[0] ? m->regions[i].name : "[anonymous]",
-			   reasons[m->regions[i].status[0]], reasons[m->regions[i].status[1]], reasons[m->regions[i].status[2]] );
+			m->regions[i].start, m->regions[i].end, m->regions[i].perms, m->regions[i].name[0] ? m->regions[i].name : "[anonymous]",
+			reasons[m->regions[i].status[0]], reasons[m->regions[i].status[1]], reasons[m->regions[i].status[2]], test_res ? "\033[42m\x1B[30mPASS\033[0m":"\033[41m\x1B[30mFAILED\033[0m"
+#ifdef DEBUG
+			, a1 ,a2 ,a3, a4, a5
+#endif
+			);
 	}
-	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+\n");
+	printf("+-----------------------------------------+------+------------------------------------------+----------------------+----------------------+----------------------+---------+\n");
 }
 
 int main(int argc, char *argv[]) {
